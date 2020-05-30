@@ -31,6 +31,18 @@
                 </options>
             </control>
 
+        // Bass / Filter
+            <control>
+                <group>[Master]</group>
+                <key>DJCStarlight.bassFilterButton</key>
+                <description>Bass / Filter button</description>
+                <status>0x90</status>
+                <midino>0x01</midino>
+                <options>
+                    <script-binding />
+                </options>
+            </control>
+
     /****************************************************************************************************/
     // NN's MIDI Channel 2 (0x91 Deck A - Standard MODE)
     /****************************************************************************************************/

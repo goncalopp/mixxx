@@ -12,6 +12,12 @@ DJCStarlight.scratchShiftMultiplier = 4;
 // How fast bending is.
 DJCStarlight.bendScale = 1.0;
 
+// How long after holding Bass / Filter button to maximize the library
+DJCStarlight.libraryMaximizeDelay = 200;
+
+// How fast to scroll through the library
+DJCStarlight.libraryScrollSpeed = 10;
+
 // DJControl_Starlight_scripts.js
 //
 // ****************************************************************************
@@ -51,11 +57,13 @@ DJCStarlight.bendScale = 1.0;
 // https://github.com/eslint/eslint/issues/1939
 /*eslint-disable no-unused-vars*/
 
+// -------- Constants -------------------------------
 DJCStarlight.kScratchActionNone = 0;
 DJCStarlight.kScratchActionScratch = 1;
 DJCStarlight.kScratchActionSeek = 2;
 DJCStarlight.kScratchActionBend = 3;
 
+// -------- Functions -------------------------------
 
 // The base LED are mapped to the VU Meter for light show.
 DJCStarlight.baseLEDUpdate = function(value, group, control){
@@ -73,10 +81,14 @@ DJCStarlight.baseLEDUpdate = function(value, group, control){
 
 
 DJCStarlight.init = function() {
+    // Whether the Bass / Filter button is currently held
+    DJCStarlight.bassShifted = false;
     DJCStarlight.scratchButtonState = true;
     DJCStarlight.scratchAction = {
         1: DJCStarlight.kScratchActionNone,
         2: DJCStarlight.kScratchActionNone};
+    // Used to assist in library scrolling speed
+    DJCStarlight.wheelScrollState = [0, 0];
 
     // Turn off base LED default behavior
     midi.sendShortMsg(0x90,0x24,0x00);
@@ -133,12 +145,30 @@ DJCStarlight._convertWheelRotation = function(value) {
     return value < 0x40 ? 1 : -1;
 }
 
+DJCStarlight.wheelTap = function(deck) {
+    if (DJCStarlight.bassShifted){
+        if (deck === 1){
+            // Expand / collapse library sidebar
+            engine.setValue("[Playlist]", "ToggleSelectedSidebarItem", true);
+        }
+        if (deck === 2){
+            // Load track
+            for (var track = 1; track <= 2; track++){
+                if (!engine.getValue("[Channel" + track + "]", "play")){
+                    engine.setValue("[Channel" + track + "]", "LoadSelectedTrack", true);
+                    break;
+                    }
+                }
+        }
+    }
+}
 
 // The touch action on the jog wheel's top surface
 DJCStarlight.wheelTouch = function(channel, control, value, status, group) {
     var deck = channel;
     if (value > 0) {
         //  Touching the wheel.
+        DJCStarlight.wheelTouchTime = new Date();
         if (engine.getValue("[Channel" + deck + "]", "play") !== 1 || DJCStarlight.scratchButtonState) {
             DJCStarlight._scratchEnable(deck);
             DJCStarlight.scratchAction[deck] = DJCStarlight.kScratchActionScratch;
@@ -147,6 +177,12 @@ DJCStarlight.wheelTouch = function(channel, control, value, status, group) {
         }
     } else {
         // Released the wheel.
+        delta = (new Date()) - DJCStarlight.wheelTouchTime;
+        if (delta < 200) {
+            // A quick tap on the wheel
+            DJCStarlight.wheelTap(deck);
+            }
+
         engine.scratchDisable(deck);
         DJCStarlight.scratchAction[deck] = DJCStarlight.kScratchActionNone;
     }
@@ -186,10 +222,28 @@ DJCStarlight._scratchWheelImpl = function(deck, value) {
 };
 
 
+// Browsing the library with the jog wheels
+DJCStarlight._libraryBrowse = function(deck, value) {
+    var interval = DJCStarlight._convertWheelRotation(value) / 100 * DJCStarlight.libraryScrollSpeed;
+    DJCStarlight.wheelScrollState[deck-1] += interval;
+    var step = Math.floor(DJCStarlight.wheelScrollState[deck-1]);
+    DJCStarlight.wheelScrollState[deck-1] -= step;
+    if (deck === 1){
+        engine.setValue("[Playlist]", "SelectPlaylist", step);
+    }
+    if (deck === 2){
+        engine.setValue("[Playlist]", "SelectTrackKnob", step);
+    }
+}
+
 // Scratching on the jog wheel (rotating it while pressing the top surface)
 DJCStarlight.scratchWheel = function(channel, control, value, status, group) {
     var deck = channel;
-    DJCStarlight._scratchWheelImpl(deck, value);
+    if (!DJCStarlight.bassShifted){
+        DJCStarlight._scratchWheelImpl(deck, value);
+    } else {
+        DJCStarlight._libraryBrowse(deck, value);
+    }
 };
 
 
@@ -275,6 +329,22 @@ DJCStarlight.shiftButton = function(channel, control, value, status, group) {
     }
 };
 
+DJCStarlight.bassFilterButton = function(channel, control, value, status, group) {
+    // The Bass / Filter button acts as a second "shift" button
+    if (value) {
+        DJCStarlight.bassShifted = true;
+        // Maximize library after holding button for some time
+        DJCStarlight.bassShiftTimer = engine.beginTimer(DJCStarlight.libraryMaximizeDelay, DJCStarlight._maximizeLibrary);
+    } else {
+        DJCStarlight.bassShifted = false;
+        engine.stopTimer(DJCStarlight.bassShiftTimer);
+        engine.setValue("[Master]", "maximize_library", false);
+    }
+};
+
+DJCStarlight._maximizeLibrary = function(){
+    engine.setValue("[Master]", "maximize_library", true);
+}
 
 DJCStarlight.shutdown = function() {
     // Reset base LED
