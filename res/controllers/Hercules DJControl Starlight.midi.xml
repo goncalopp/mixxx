@@ -74,12 +74,12 @@
         // Sync
             <control>
                 <group>[Channel1]</group>
-                <key>sync_enabled</key>
+                <key>DJCStarlight.sync</key>
                 <description>Sync button</description>
                 <status>0x91</status>
                 <midino>0x05</midino>
                 <options>
-                    <normal/>
+                    <script-binding />
                 </options>
             </control>
 
@@ -150,12 +150,12 @@
         // Sync
             <control>
                 <group>[Channel2]</group>
-                <key>sync_enabled</key>
+                <key>DJCStarlight.sync</key>
                 <description>Sync button</description>
                 <status>0x92</status>
                 <midino>0x05</midino>
                 <options>
-                    <normal/>
+                    <script-binding />
                 </options>
             </control>
 

@@ -308,6 +308,18 @@ DJCStarlight.cueMix = function(channel, control, value, status, group) {
 };
 
 
+DJCStarlight.sync = function(channel, control, value, status, group) {
+    var channelstr = "[Channel" + channel + "]";
+    var deck = channel;
+    if (DJCStarlight.bassShifted) {
+        if (value){
+            engine.setValue(channelstr, "CloneFromDeck", -1);
+        }
+    } else {
+        engine.setValue(channelstr, "sync_enabled", value ? 1 : 0);
+    }
+}
+
 DJCStarlight.shiftButton = function(channel, control, value, status, group) {
     if (value >= 0x40) {
         // When Shift is held, light the LEDS to show the status of the alt
